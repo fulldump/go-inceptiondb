@@ -17,6 +17,8 @@ import (
 type Client struct {
 	baseURL    *url.URL
 	httpClient *http.Client
+	apiKey     string
+	apiSecret  string
 }
 
 // Option configures a Client instance.
@@ -26,6 +28,14 @@ type Option func(*Client)
 func WithHTTPClient(h *http.Client) Option {
 	return func(c *Client) {
 		c.httpClient = h
+	}
+}
+
+// WithAPICredentials configures the client to send the authentication headers.
+func WithAPICredentials(apiKey, apiSecret string) Option {
+	return func(c *Client) {
+		c.apiKey = apiKey
+		c.apiSecret = apiSecret
 	}
 }
 
@@ -277,6 +287,13 @@ func (c *Client) do(ctx context.Context, method, path string, body io.Reader, co
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
+	}
+
+	if c.apiKey != "" {
+		req.Header.Set("Api-Key", c.apiKey)
+	}
+	if c.apiSecret != "" {
+		req.Header.Set("Api-Secret", c.apiSecret)
 	}
 
 	resp, err := c.httpClient.Do(req)

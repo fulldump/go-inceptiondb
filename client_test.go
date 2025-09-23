@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -66,5 +68,64 @@ func TestEncodeQueryRequestPayload(t *testing.T) {
 	}
 	if _, ok := payload["filter"].(map[string]any); !ok {
 		t.Fatalf("filter type = %T, want map[string]any", payload["filter"])
+	}
+}
+
+func TestClientWithAPICredentials(t *testing.T) {
+	const (
+		apiKey    = "test-key"
+		apiSecret = "test-secret"
+	)
+
+	var receivedKey, receivedSecret string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedKey = r.Header.Get("Api-Key")
+		receivedSecret = r.Header.Get("Api-Secret")
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, "[]")
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(srv.URL, WithAPICredentials(apiKey, apiSecret))
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	if _, err := client.ListCollections(context.Background()); err != nil {
+		t.Fatalf("ListCollections() error = %v", err)
+	}
+
+	if receivedKey != apiKey {
+		t.Fatalf("Api-Key header = %q, want %q", receivedKey, apiKey)
+	}
+	if receivedSecret != apiSecret {
+		t.Fatalf("Api-Secret header = %q, want %q", receivedSecret, apiSecret)
+	}
+}
+
+func TestClientWithoutAPICredentials(t *testing.T) {
+	var receivedKey, receivedSecret string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedKey = r.Header.Get("Api-Key")
+		receivedSecret = r.Header.Get("Api-Secret")
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, "[]")
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(srv.URL)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	if _, err := client.ListCollections(context.Background()); err != nil {
+		t.Fatalf("ListCollections() error = %v", err)
+	}
+
+	if receivedKey != "" {
+		t.Fatalf("Api-Key header = %q, want empty", receivedKey)
+	}
+	if receivedSecret != "" {
+		t.Fatalf("Api-Secret header = %q, want empty", receivedSecret)
 	}
 }
